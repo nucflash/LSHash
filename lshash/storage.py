@@ -4,7 +4,13 @@
 # This module is part of lshash and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import json
+import ujson
+import cPickle as pickle
+from scipy.sparse import csr_matrix 
+from numpy import array
+
+import logging
+logging.basicConfig(format='[%(levelname)s] (%(threadName)-10s) %(asctime)s %(message)s',level=logging.DEBUG)
 
 try:
     import redis
@@ -137,7 +143,13 @@ class CassandraStorage(BaseStorage):
 
     def append_val(self, key, val):
         cursor = self.storage.cursor()
-        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=json.dumps(val)))
+        logging.debug("Dumping JSON...")
+        # s = ujson.dumps(val)
+        logging.debug("done")
+        s = pickle.dumps(csr_matrix(array(val)))
+        
+        logging.debug(s)
+        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=s))
 
     def get_list(self, key):
         cursor = self.storage.cursor()

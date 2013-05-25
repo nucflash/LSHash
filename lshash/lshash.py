@@ -5,7 +5,7 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import os
-import json
+import cPickle as pickle
 import numpy as np
 
 from storage import storage
@@ -135,7 +135,6 @@ class LSHash(object):
             A Python tuple or list object that contains only numbers.
             The dimension needs to be 1 * `input_dim`.
         """
-
         try:
             input_point = np.array(input_point)  # for faster dot product
             projections = np.dot(planes, input_point)
@@ -159,7 +158,8 @@ class LSHash(object):
             # JSON-serialized in the case of Redis
             try:
                 # Return the point stored as list, without the extra data
-                tuples = json.loads(json_or_tuple)
+                tuples = pickle.loads(json_or_tuple.encode('utf-8'))
+                tuples = tuples.toarray()[0]
             except TypeError:
                 print("The value stored is not JSON-serilizable")
                 raise
@@ -172,7 +172,8 @@ class LSHash(object):
         if isinstance(tuples[0], tuple):
             # in this case extra data exists
             return np.asarray(tuples[0])
-
+        elif isinstance(tuples, np.ndarray):
+            return tuples
         elif isinstance(tuples, (tuple, list)):
             try:
                 return np.asarray(tuples)
