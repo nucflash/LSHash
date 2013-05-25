@@ -1,0 +1,2 @@
+25 May 2013 Manos Tsagkias <tsagias@gmail.com> added Cassandra backend
+
