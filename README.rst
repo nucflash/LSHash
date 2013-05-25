@@ -21,6 +21,7 @@ Installation
 
 - numpy
 - redis (if persistency through Redis is needed)
+- cql (if persistency through Cassandra is needed)
 - bitarray (if hamming distance is used as distance function)
 
 To install:
