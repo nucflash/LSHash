@@ -11,6 +11,11 @@ try:
 except ImportError:
     redis = None
 
+try:
+    import cql
+except ImportError:
+    cql = None
+
 __all__ = ['storage']
 
 
@@ -23,8 +28,11 @@ def storage(storage_config, index):
     elif 'redis' in storage_config:
         storage_config['redis']['db'] = index
         return RedisStorage(storage_config['redis'])
+    elif 'cassandra' in storage_config:
+        storage_config['cassandra']['db'] = index
+        return CassandraStorage(storage_config['cassandra'])
     else:
-        raise ValueError("Only in-memory dictionary and Redis are supported.")
+        raise ValueError("Only in-memory dictionary, Redis and Cassandra are supported.")
 
 
 class BaseStorage(object):
@@ -103,3 +111,39 @@ class RedisStorage(BaseStorage):
 
     def get_list(self, key):
         return self.storage.lrange(key, 0, -1)
+
+class CassandraStorage(BaseStorage):
+    def __init__(self, config):
+        if not cql:
+            raise ImportError("cql is required to use Cassandra as storage.")
+        self.name = 'cassandra'
+        self.storage = cql.connect(config["host"], config["port"], cql_version='3.0.0')
+        cursor = self.storage.cursor()
+        cursor.execute("""USE %s""" % config["keyspace"])
+
+    def keys(self, pattern="*"):
+        cursor = self.storage.cursor()
+        cursor.execute("""SELECT key FROM lsh""")
+        return cursor.fetchall()
+
+    def set_val(self, key, val):
+        cursor = self.storage.cursor()
+        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=val))
+
+    def get_val(self, key):
+        cursor = self.storage.cursor()
+        cursor.execute("""SELECT val FROM lsh WHERE key=:key LIMIT 1""", dict(key=key))
+        return cursor.fetchone()
+
+    def append_val(self, key, val):
+        cursor = self.storage.cursor()
+        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=json.dumps(val)))
+
+    def get_list(self, key):
+        cursor = self.storage.cursor()
+        cursor.execute("""SELECT val FROM lsh WHERE key=:key""", dict(key=key))
+        out = []
+        for row in cursor:
+            out.append(row[0])
+        
+        return out

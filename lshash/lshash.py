@@ -32,10 +32,18 @@ class LSHash(object):
         (optional) The number of hash tables used for multiple lookups.
     :param storage_config:
         (optional) A dictionary of the form `{backend_name: config}` where
-        `backend_name` is the either `dict` or `redis`, and `config` is the
-        configuration used by the backend. For `redis` it should be in the
-        format of `{"redis": {"host": hostname, "port": port_num}}`, where
-        `hostname` is normally `localhost` and `port` is normally 6379.
+        `backend_name` is the either `dict`, `redis`, or
+        `cassandra`, and `config` is the configuration used by the
+        backend. For `redis` it should be in the format of
+        `{"redis": {"host": hostname, "port": port_num}}`, where
+        `hostname` is normally `localhost` and `port` is normally
+        6379. For `cassandra` the format is `{"cassandra": {"host":
+        hostname, "port": port_num, "keyspace": keyspace}}, where
+        `hostname` is normally localhost, `port` is normally
+        9160, and `keyspace` is the keyspace where the table `lsh`
+        exists. `lsh` needs to be manually initialized using the CQL
+        command: CREATE TABLE lsh (key text, val text, PRIMARY KEY
+        (key, val)).
     :param matrices_filename:
         (optional) Specify the path to the compressed numpy file ending with
         extension `.npz`, where the uniform random planes are stored, or to be
@@ -151,7 +159,7 @@ class LSHash(object):
             # JSON-serialized in the case of Redis
             try:
                 # Return the point stored as list, without the extra data
-                tuples = json.loads(json_or_tuple)[0]
+                tuples = json.loads(json_or_tuple)
             except TypeError:
                 print("The value stored is not JSON-serilizable")
                 raise
