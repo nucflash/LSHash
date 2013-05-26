@@ -50,7 +50,7 @@ class BaseStorage(object):
         """ Returns a list of binary hashes that are used as dict keys. """
         raise NotImplementedError
 
-    def set_val(self, key, val):
+    def set_val(self, key, val, extra_data):
         """ Set `val` at `key`, note that the `val` must be a string. """
         raise NotImplementedError
 
@@ -58,7 +58,7 @@ class BaseStorage(object):
         """ Return `val` at `key`, note that the `val` must be a string. """
         raise NotImplementedError
 
-    def append_val(self, key, val):
+    def append_val(self, key, val, extra_data):
         """ Append `val` to the list stored at `key`.
 
         If the key is not yet present in storage, create a list with `val` at
@@ -83,13 +83,13 @@ class InMemoryStorage(BaseStorage):
     def keys(self):
         return self.storage.keys()
 
-    def set_val(self, key, val):
+    def set_val(self, key, val, extra_data):
         self.storage[key] = val
 
     def get_val(self, key):
         return self.storage[key]
 
-    def append_val(self, key, val):
+    def append_val(self, key, val, extra_data):
         self.storage.setdefault(key, []).append(val)
 
     def get_list(self, key):
@@ -106,13 +106,13 @@ class RedisStorage(BaseStorage):
     def keys(self, pattern="*"):
         return self.storage.keys(pattern)
 
-    def set_val(self, key, val):
+    def set_val(self, key, val, extra_data):
         self.storage.set(key, val)
 
     def get_val(self, key):
         return self.storage.get(key)
 
-    def append_val(self, key, val):
+    def append_val(self, key, val, extra_data):
         self.storage.rpush(key, json.dumps(val))
 
     def get_list(self, key):
@@ -132,30 +132,25 @@ class CassandraStorage(BaseStorage):
         cursor.execute("""SELECT key FROM lsh""")
         return cursor.fetchall()
 
-    def set_val(self, key, val):
+    def set_val(self, key, val, extra_data):
         cursor = self.storage.cursor()
-        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=val))
+        cursor.execute("""INSERT INTO lsh (key, val, extra_data) VALUES (:key, :val, :extra_data)""", dict(key=key, val=s, extra_data=extra_data))
 
     def get_val(self, key):
         cursor = self.storage.cursor()
-        cursor.execute("""SELECT val FROM lsh WHERE key=:key LIMIT 1""", dict(key=key))
+        cursor.execute("""SELECT val, extra_data FROM lsh WHERE key=:key LIMIT 1""", dict(key=key))
         return cursor.fetchone()
 
-    def append_val(self, key, val):
+    def append_val(self, key, val, extra_data):
         cursor = self.storage.cursor()
-        logging.debug("Dumping JSON...")
-        # s = ujson.dumps(val)
-        logging.debug("done")
         s = pickle.dumps(csr_matrix(array(val)))
-        
-        logging.debug(s)
-        cursor.execute("""INSERT INTO lsh (key, val) VALUES (:key, :val)""", dict(key=key, val=s))
+        cursor.execute("""INSERT INTO lsh (key, val, extra_data) VALUES (:key, :val, :extra_data)""", dict(key=key, val=s, extra_data=extra_data))
 
     def get_list(self, key):
         cursor = self.storage.cursor()
-        cursor.execute("""SELECT val FROM lsh WHERE key=:key""", dict(key=key))
+        cursor.execute("""SELECT val, extra_data FROM lsh WHERE key=:key""", dict(key=key))
         out = []
         for row in cursor:
-            out.append(row[0])
+            out.append((row[0], row[1]))
         
         return out

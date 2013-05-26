@@ -122,7 +122,6 @@ class LSHash(object):
         """ Generate uniformly distributed hyperplanes and return it as a 2D
         numpy array.
         """
-
         return np.random.randn(self.hash_size, self.input_dim)
 
     def _hash(self, planes, input_point):
@@ -136,7 +135,6 @@ class LSHash(object):
             The dimension needs to be 1 * `input_dim`.
         """
         try:
-            input_point = np.array(input_point)  # for faster dot product
             projections = np.dot(planes, input_point)
         except TypeError as e:
             print("""The input point needs to be an array-like object with
@@ -168,20 +166,22 @@ class LSHash(object):
             # (point:tuple, extra_data). Otherwise (i.e., extra_data=None),
             # return the point stored as a tuple
             tuples = json_or_tuple
-
-        if isinstance(tuples[0], tuple):
-            # in this case extra data exists
-            return np.asarray(tuples[0])
-        elif isinstance(tuples, np.ndarray):
-            return tuples
-        elif isinstance(tuples, (tuple, list)):
-            try:
-                return np.asarray(tuples)
-            except ValueError as e:
-                print("The input needs to be an array-like object", e)
-                raise
-        else:
-            raise TypeError("query data is not supported")
+        
+        
+        return tuples
+        # if isinstance(tuples[0], tuple):
+        #     # in this case extra data exists
+        #     return np.asarray(tuples[0])
+        # elif isinstance(tuples, np.ndarray):
+        #     return tuples
+        # elif isinstance(tuples, (tuple, list)):
+        #     try:
+        #         return np.asarray(tuples)
+        #     except ValueError as e:
+        #         print("The input needs to be an array-like object", e)
+        #         raise
+        # else:
+        #     raise TypeError("query data is not supported")
 
     def index(self, input_point, extra_data=None):
         """ Index a single input point by adding it to the selected storage.
@@ -201,17 +201,17 @@ class LSHash(object):
             basic types such as strings and integers.
         """
 
-        if isinstance(input_point, np.ndarray):
-            input_point = input_point.tolist()
-
-        if extra_data:
-            value = (tuple(input_point), extra_data)
-        else:
-            value = tuple(input_point)
+        # if isinstance(input_point, np.ndarray):
+        #     input_point = input_point.tolist()
+        # 
+        # if extra_data:
+        #     value = (tuple(input_point), extra_data)
+        # else:
+        #     value = tuple(input_point)
 
         for i, table in enumerate(self.hash_tables):
             table.append_val(self._hash(self.uniform_planes[i], input_point),
-                             value)
+                             input_point, extra_data)
 
     def query(self, query_point, num_results=None, distance_func=None):
         """ Takes `query_point` which is either a tuple or a list of numbers,
@@ -268,11 +268,13 @@ class LSHash(object):
             for i, table in enumerate(self.hash_tables):
                 binary_hash = self._hash(self.uniform_planes[i], query_point)
                 candidates.update(table.get_list(binary_hash))
-
+        
         # rank candidates by distance function
-        candidates = [(ix, d_func(query_point, self._as_np_array(ix)))
-                      for ix in candidates]
-        candidates.sort(key=lambda x: x[1])
+        candidates = [(iid, ix, d_func(query_point, self._as_np_array(ix)))
+                      for ix, iid in candidates]
+        candidates.sort(key=lambda x: x[2])
+        cid, cval, cdis = zip(*candidates)
+        candidates = zip(cid, cdis)
 
         return candidates[:num_results] if num_results else candidates
 
@@ -286,13 +288,13 @@ class LSHash(object):
     @staticmethod
     def euclidean_dist(x, y):
         """ This is a hot function, hence some optimizations are made. """
-        diff = np.array(x) - y
+        diff = x - y
         return np.sqrt(np.dot(diff, diff))
 
     @staticmethod
     def euclidean_dist_square(x, y):
         """ This is a hot function, hence some optimizations are made. """
-        diff = np.array(x) - y
+        diff = x - y
         return np.dot(diff, diff)
 
     @staticmethod
